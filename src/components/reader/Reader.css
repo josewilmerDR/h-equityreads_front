@@ -1,0 +1,293 @@
+/* src/components/reader/Reader.css */
+
+.reader {
+    /* Ocupa toda la pantalla y organiza header / main / footer */
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    outline: none;
+    font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+      sans-serif;
+    overflow: hidden; /* evita scroll de toda la página dentro del reader */
+  }
+  
+  /* TEMAS */
+  .reader--light {
+    background: #f5f5f5;
+    color: #111827;
+  }
+  
+  .reader--sepia {
+    background: #f4ecd8;
+    color: #3f3a33;
+  }
+  
+  .reader--dark {
+    background: #020617;
+    color: #e5e7eb;
+  }
+  
+  /* HEADER */
+  .reader-header {
+    flex-shrink: 0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0.75rem 1.5rem;
+    border-bottom: 1px solid rgba(148, 163, 184, 0.3);
+    gap: 1rem;
+  }
+  
+  .reader-book-meta {
+    display: flex;
+    flex-direction: column;
+  }
+  
+  .reader-title {
+    font-size: 1rem;
+    font-weight: 600;
+    margin: 0;
+  }
+  
+  .reader-author {
+    font-size: 0.875rem;
+    opacity: 0.8;
+    margin: 0.15rem 0 0;
+  }
+  
+  .reader-progress {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 0.3rem;
+  }
+  
+  .reader-progress-bar {
+    width: 180px;
+    height: 6px;
+    border-radius: 999px;
+    background: rgba(148, 163, 184, 0.3);
+    overflow: hidden;
+  }
+  
+  .reader-progress-bar-fill {
+    height: 100%;
+    border-radius: 999px;
+    background: linear-gradient(90deg, #f59e0b, #f97316);
+  }
+  
+  .reader-progress-label {
+    font-size: 0.75rem;
+    opacity: 0.8;
+  }
+  
+  /* MAIN: ocupa todo el espacio entre header y footer, sin scroll */
+  .reader-main {
+    flex: 1;
+    display: flex;
+    justify-content: center;
+    padding: 1.5rem 0.75rem;
+    overflow: hidden; /* clave: el contenido se recorta, no hace scroll */
+  }
+  
+  /* “Página” ocupa el alto disponible */
+  .reader-page {
+    position: relative;
+    /* max-width: 1100px; */
+    width: 100%;
+    height: 100%;
+    border-radius: 1rem;
+    padding: 1.75rem 1.5rem;
+    box-shadow: 0 18px 45px rgba(15, 23, 42, 0.45);
+    background: rgba(15, 23, 42, 0.95);
+    color: #e5e7eb;
+    overflow: hidden; /* por si acaso */
+  }
+  
+  .reader--light .reader-page {
+    background: #ffffff;
+    color: #111827;
+    box-shadow: 0 18px 45px rgba(15, 23, 42, 0.15);
+  }
+  
+  .reader--sepia .reader-page {
+    background: #fdf7e9;
+    color: #3f3a33;
+    box-shadow: 0 18px 45px rgba(63, 58, 51, 0.2);
+  }
+  
+  .reader-page-inner {
+    position: relative;
+    z-index: 1;
+    width: 100%;
+    height: 100%;
+  }
+  
+  /* Tamaños de fuente */
+  .reader-page--font-sm {
+    font-size: 0.9rem;
+    line-height: 1.7;
+  }
+  
+  .reader-page--font-md {
+    font-size: 1rem;
+    line-height: 1.8;
+  }
+  
+  .reader-page--font-lg {
+    font-size: 1.1rem;
+    line-height: 1.9;
+  }
+  
+  .reader-page--font-xl {
+    font-size: 1.25rem;
+    line-height: 2;
+  }
+  
+  /* TEXTO EN DOS COLUMNAS, SIN SCROLL */
+  .reader-text {
+    margin: 0;
+    white-space: pre-wrap;
+    height: 100%;
+    column-count: 2;
+    column-gap: 3rem;
+    overflow: hidden; /* lo que no quepa se “corta” -> lo maneja el paginado */
+  }
+  
+  /* En pantallas pequeñas, una sola columna (más cómodo) */
+  @media (max-width: 900px) {
+    .reader-text {
+      column-count: 1;
+      column-gap: 0;
+    }
+  }
+  
+  /* Áreas clicables para pasar página */
+  .reader-page-tap {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 22%;
+    z-index: 2;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+  }
+  
+  .reader-page-tap-left {
+    left: 0;
+  }
+  
+  .reader-page-tap-right {
+    right: 0;
+  }
+  
+  .reader-page-tap-left:hover {
+    background: radial-gradient(
+      circle at left center,
+      rgba(15, 23, 42, 0.15),
+      transparent
+    );
+  }
+  
+  .reader-page-tap-right:hover {
+    background: radial-gradient(
+      circle at right center,
+      rgba(15, 23, 42, 0.15),
+      transparent
+    );
+  }
+  
+  /* FOOTER SIEMPRE ABAJO */
+  .reader-footer {
+    flex-shrink: 0;
+    padding: 0.75rem 1.5rem 1rem;
+    border-top: 1px solid rgba(148, 163, 184, 0.3);
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem 1.5rem;
+    justify-content: space-between;
+    align-items: center;
+    background: inherit; /* mantiene el fondo del tema */
+  }
+  
+  .reader-footer-group {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+  
+  .reader-footer-label {
+    font-size: 0.8rem;
+    opacity: 0.85;
+  }
+  
+  .reader-footer-buttons {
+    display: flex;
+    gap: 0.4rem;
+  }
+  
+  .reader-btn {
+    border-radius: 999px;
+    border: 1px solid rgba(148, 163, 184, 0.6);
+    padding: 0.2rem 0.8rem;
+    background: transparent;
+    color: inherit;
+    font-size: 0.8rem;
+    cursor: pointer;
+    transition: background 0.15s ease, border-color 0.15s ease,
+      transform 0.1s ease;
+  }
+  
+  .reader-btn:hover {
+    background: rgba(148, 163, 184, 0.15);
+    transform: translateY(-0.5px);
+  }
+  
+  .reader-btn--active {
+    background: linear-gradient(90deg, #f59e0b, #f97316);
+    border-color: transparent;
+    color: #111827;
+  }
+  
+  /* RESPONSIVE GENERAL */
+  @media (max-width: 768px) {
+    .reader-header {
+      flex-direction: column;
+      align-items: flex-start;
+    }
+  
+    .reader-main {
+      padding: 1rem 0.5rem;
+    }
+  
+    .reader-page {
+      padding: 1.25rem 1rem;
+      border-radius: 0.75rem;
+    }
+  
+    .reader-progress-bar {
+      width: 140px;
+    }
+  
+    .reader-footer {
+      flex-direction: column;
+      align-items: flex-start;
+    }
+  }
+  
+  /* Div oculto para medir cuánto texto cabe en una "página" */
+  .reader-measure {
+    position: fixed;
+    left: -9999px;
+    top: -9999px;
+    visibility: hidden;
+    white-space: pre-wrap;
+  }
+  
+  /* Siempre una sola columna en el medidor */
+  .reader-measure {
+    column-count: 1 !important;
+    column-gap: 0 !important;
+  }
+  
