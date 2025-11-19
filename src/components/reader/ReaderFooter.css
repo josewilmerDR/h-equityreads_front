@@ -1,0 +1,39 @@
+/* src/components/reader/ReaderFooter.css */
+
+/* FOOTER */
+.reader-footer {
+    flex-shrink: 0;
+    height: 30px;
+    position: relative;
+    font-family: -apple-system, sans-serif;
+    font-size: 0.7rem;
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+  }
+  
+  .reader-progress-bar-container {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 3px;
+    background: rgba(150, 150, 150, 0.2);
+  }
+  
+  .reader-progress-fill {
+    height: 100%;
+    background-color: var(--kindle-blue);
+    transition: width 0.3s ease;
+  }
+  
+  .reader-footer-info {
+    margin-top: 8px;
+    width: 100%;
+    max-width: 1100px;
+    display: flex;
+    justify-content: space-between;
+    padding: 0 2rem;
+    opacity: 0.6;
+  }
+  

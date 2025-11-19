@@ -1,10 +1,9 @@
 // src/pages/ReaderPage.tsx
 import React, { useEffect, useState } from "react";
-import { useParams } from "react-router-dom";
-import Navbar from "../components/layout/Navbar";
-import Footer from "../components/layout/Footer";
+import { useParams, useNavigate } from "react-router-dom";
 import Reader from "../components/reader/Reader";
 
+// Tipos de respuesta de tu API
 interface ChapterResponse {
   bookId: string;
   number: number;
@@ -12,18 +11,47 @@ interface ChapterResponse {
   contentHtml: string;
 }
 
-// Idealmente sacar esto a un archivo de config/env, pero por ahora aquí:
+interface BookMeta {
+  id: string;
+  title: string;
+  author: string;
+  chapters: { number: number; title: string }[];
+}
+
+// URL base (idealmente mover a .env)
 const API_BASE_URL =
   "https://5000-firebase-hreads-back-1763343106367.cluster-dwvm25yncracsxpd26rcd5ja3m.cloudworkstations.dev";
 
 const ReaderPage: React.FC = () => {
-  // Asegúrate de que tu ruta en App.tsx sea:  /reader/:bookId/:chapter
   const { bookId, chapter } = useParams<{ bookId: string; chapter: string }>();
+  const navigate = useNavigate();
 
   const [chapterData, setChapterData] = useState<ChapterResponse | null>(null);
+  const [bookMeta, setBookMeta] = useState<BookMeta | null>(null);
+
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  const chapterNumber = chapter ? parseInt(chapter, 10) : NaN;
+
+  // 1. Cargar metadatos del libro
+  useEffect(() => {
+    if (!bookId) return;
+
+    fetch(`${API_BASE_URL}/api/books/${bookId}`)
+      .then((res) => {
+        if (!res.ok) throw new Error("No se pudo cargar el libro");
+        return res.json();
+      })
+      .then((data: BookMeta) => {
+        setBookMeta(data);
+      })
+      .catch((err) => {
+        console.error("Error fetching book meta:", err);
+      });
+  }, [bookId]);
+
+  // 2. Cargar contenido del capítulo
   useEffect(() => {
     if (!bookId || !chapter) {
       setError("Libro o capítulo no especificado.");
@@ -31,7 +59,6 @@ const ReaderPage: React.FC = () => {
       return;
     }
 
-    const chapterNumber = parseInt(chapter, 10);
     if (Number.isNaN(chapterNumber)) {
       setError("Capítulo inválido.");
       setLoading(false);
@@ -41,7 +68,6 @@ const ReaderPage: React.FC = () => {
     setLoading(true);
     setError(null);
 
-    // Ahora apunta al backend real, no al mismo host del front
     fetch(`${API_BASE_URL}/api/books/${bookId}/chapters/${chapterNumber}`)
       .then((res) => {
         if (!res.ok) throw new Error("No se pudo cargar el capítulo");
@@ -55,146 +81,80 @@ const ReaderPage: React.FC = () => {
         setError("Hubo un problema al cargar este capítulo.");
       })
       .finally(() => setLoading(false));
-  }, [bookId, chapter]);
+  }, [bookId, chapterNumber]);
 
+  // Lógica de navegación entre capítulos
+  const totalChapters = bookMeta?.chapters?.length ?? undefined;
+
+  const hasPrevChapter = !Number.isNaN(chapterNumber) && chapterNumber > 1;
+  const hasNextChapter =
+    !Number.isNaN(chapterNumber) &&
+    (totalChapters ? chapterNumber < totalChapters : true); // Si no sabemos el total, asumimos true hasta fallar
+
+  const handleNextChapter = () => {
+    if (!bookId || Number.isNaN(chapterNumber)) return;
+    if (totalChapters && chapterNumber >= totalChapters) return;
+    navigate(`/reader/${bookId}/${chapterNumber + 1}`);
+  };
+
+  const handlePrevChapter = () => {
+    if (!bookId || Number.isNaN(chapterNumber)) return;
+    if (chapterNumber <= 1) return;
+    navigate(`/reader/${bookId}/${chapterNumber - 1}`);
+  };
+
+  // --- ESTADOS DE CARGA Y ERROR ---
+  
+  // Usamos un fondo blanco simple o skeleton loader mientras carga
+  if (loading) {
+    return (
+      <div className="flex h-screen w-screen items-center justify-center bg-white text-gray-500">
+        <span className="animate-pulse">Cargando contenido...</span>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex h-screen w-screen flex-col items-center justify-center bg-white text-red-500 gap-4">
+        <p>{error}</p>
+        <button 
+          onClick={() => navigate(-1)}
+          className="px-4 py-2 bg-gray-100 rounded hover:bg-gray-200 text-black transition"
+        >
+          Volver atrás
+        </button>
+      </div>
+    );
+  }
+
+  if (!chapterData) return null;
+
+  // --- RENDERIZADO DEL LECTOR ---
   return (
-    <div className="flex flex-col min-h-screen bg-slate-950 text-white">
-      <Navbar />
-      <main className="flex-grow">
-        {loading && (
-          <div className="flex h-full items-center justify-center text-slate-300">
-            Cargando capítulo...
-          </div>
-        )}
-
-        {error && !loading && (
-          <div className="flex h-full items-center justify-center text-red-400">
-            {error}
-          </div>
-        )}
-
-        {!loading && !error && chapterData && (
-          <Reader
-            title={chapterData.title}
-            content={chapterData.contentHtml}
-          />
-        )}
-      </main>
-      <Footer />
+    // Nota: Quitamos Navbar y Footer globales para modo inmersivo
+    // El componente Reader ocupa el 100% de width y height
+    <div style={{ width: "100vw", height: "100vh", overflow: "hidden" }}>
+      <Reader
+        // Datos del libro
+        title={bookMeta?.title ?? "Libro Desconocido"}
+        chapterTitle={chapterData.title}
+        author={bookMeta?.author}
+        
+        // Contenido
+        contentHtml={chapterData.contentHtml}
+        
+        // Configuración inicial
+        initialLocation={0} 
+        
+        // Navegación entre capítulos
+        onRequestNextChapter={handleNextChapter}
+        onRequestPrevChapter={handlePrevChapter}
+        hasNextChapter={hasNextChapter}
+        hasPrevChapter={hasPrevChapter}
+      />
     </div>
   );
 };
 
 export default ReaderPage;
-
-
-
-
-// // src/pages/ReaderPage.tsx
-// import React, { useEffect, useState } from "react";
-// import { useParams } from "react-router-dom";
-// import Navbar from "../components/layout/Navbar";
-// import Footer from "../components/layout/Footer";
-// import Reader from "../components/reader/Reader";
-
-// interface ChapterResponse {
-//   bookId: string;
-//   number: number;
-//   title: string;
-//   contentHtml: string; // ajusta el nombre si tu API devuelve otro campo
-// }
-
-// const ReaderPage: React.FC = () => {
-//   const { bookId, chapter } = useParams<{ bookId: string; chapter: string }>();
-
-//   const [chapterData, setChapterData] = useState<ChapterResponse | null>(null);
-//   const [loading, setLoading] = useState(true);
-//   const [error, setError] = useState<string | null>(null);
-
-//   useEffect(() => {
-//     if (!bookId || !chapter) {
-//       setError("Libro o capítulo no especificado.");
-//       setLoading(false);
-//       return;
-//     }
-
-//     const chapterNumber = parseInt(chapter, 10);
-//     if (Number.isNaN(chapterNumber)) {
-//       setError("Capítulo inválido.");
-//       setLoading(false);
-//       return;
-//     }
-
-//     setLoading(true);
-//     setError(null);
-
-//     // Si tu backend está en otro host/puerto, ajusta la URL o usa proxy
-//     fetch(`/api/books/${bookId}/chapters/${chapterNumber}`)
-//       .then((res) => {
-//         if (!res.ok) throw new Error("No se pudo cargar el capítulo");
-//         return res.json();
-//       })
-//       .then((data: ChapterResponse) => {
-//         setChapterData(data);
-//       })
-//       .catch((err) => {
-//         console.error(err);
-//         setError("Hubo un problema al cargar este capítulo.");
-//       })
-//       .finally(() => setLoading(false));
-//   }, [bookId, chapter]);
-
-//   return (
-//     <div className="flex flex-col min-h-screen bg-slate-950 text-white">
-//       <Navbar />
-//       <main className="flex-grow">
-//         {loading && (
-//           <div className="flex h-full items-center justify-center text-slate-300">
-//             Cargando capítulo...
-//           </div>
-//         )}
-
-//         {error && !loading && (
-//           <div className="flex h-full items-center justify-center text-red-400">
-//             {error}
-//           </div>
-//         )}
-
-//         {!loading && !error && chapterData && (
-//           <Reader
-//             // 🔴 IMPORTANTE:
-//             // Adapta estos nombres de props a cómo tengas definido tu componente Reader.
-//             // La idea es que en vez de usar un dummyText interno,
-//             // reciba el contenido como prop.
-//             title={chapterData.title}
-//             content={chapterData.contentHtml}
-//           />
-//         )}
-//       </main>
-//       <Footer />
-//     </div>
-//   );
-// };
-
-// export default ReaderPage;
-
-
-
-// import React from 'react';
-// import Navbar from '../components/layout/Navbar';
-// import Footer from '../components/layout/Footer';
-// import Reader from '../components/reader/Reader';
-
-// const ReaderPage: React.FC = () => {
-//   return (
-//     <div className="flex flex-col min-h-screen bg-slate-950 text-white">
-//       <Navbar />
-//       <main className="flex-grow">
-//         <Reader />
-//       </main>
-//       <Footer />
-//     </div>
-//   );
-// };
-
-// export default ReaderPage;

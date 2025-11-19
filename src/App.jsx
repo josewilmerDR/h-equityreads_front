@@ -3,6 +3,8 @@ import React from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import LandingPage from "./pages/LandingPage";
 import ReaderPage from "./pages/ReaderPage";
+import CatalogPage from "./pages/CatalogPage";
+import CategoriesPage from "./pages/CategoriesPage";
 
 function App() {
   return (
@@ -19,6 +21,12 @@ function App() {
 
         {/* Cualquier otra ruta desconocida también va al inicio */}
         <Route path="*" element={<Navigate to="/" replace />} />
+
+        <Route path="/catalog" element={<CatalogPage />} />
+        
+        <Route path="/categories" element={<CategoriesPage />} />
+
+        
       </Routes>
     </BrowserRouter>
   );

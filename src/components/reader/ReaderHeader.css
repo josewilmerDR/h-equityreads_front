@@ -1,0 +1,54 @@
+/* HEADER */
+.reader-header {
+    flex-shrink: 0;
+    height: 60px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0 1.5rem;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: inherit;
+    z-index: 10;
+    border-bottom: 1px solid rgba(0,0,0,0.05); /* Sutil separación */
+  }
+  
+  .reader-header-left { flex: 1; }
+  .reader-header-center { flex: 2; text-align: center; }
+  .reader-header-right { flex: 1; display: flex; justify-content: flex-end; gap: 1.5rem; }
+  
+  .reader-btn-library {
+    border: none;
+    background: transparent;
+    color: inherit;
+    font-size: 0.85rem;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    cursor: pointer;
+    opacity: 0.7;
+  }
+  .reader-btn-library:hover { opacity: 1; }
+  
+  .reader-title {
+    font-size: 0.85rem;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin: 0;
+    opacity: 0.8;
+  }
+  
+  .reader-icon-btn {
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    color: inherit;
+    opacity: 0.6;
+    display: flex;
+    align-items: center;
+  }
+  .reader-icon-btn:hover { opacity: 1; }
+  .reader-icon-btn svg { width: 22px; height: 22px; }
+
+  
