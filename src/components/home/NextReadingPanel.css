@@ -1,0 +1,20 @@
+/* src/components/home/NextReadingPanel.css */
+
+.book-cover-placeholder {
+  /* Layout (flex) */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+
+  /* Tamaño (h-14 w-10) */
+  height: 5rem; /* 56px */
+  width: 3rem;  /* 40px */
+
+  /* Estilo visual */
+  overflow: hidden;
+  border-radius: 0.375rem; /* rounded-md (6px) */
+  
+  /* Fondo (bg-gradient-to-b from-slate-700 to-slate-900) */
+  background: linear-gradient(to bottom, #334155, #0f172a);
+}

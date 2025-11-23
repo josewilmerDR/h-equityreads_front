@@ -1,6 +1,5 @@
 // src/services/api.ts
-const API_BASE_URL =
-  "https://5000-firebase-hreads-back-1763343106367.cluster-dwvm25yncracsxpd26rcd5ja3m.cloudworkstations.dev";
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
 
 export async function fetchBooks() {
   const res = await fetch(`${API_BASE_URL}/api/books`);
