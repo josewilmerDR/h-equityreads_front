@@ -1,15 +1,7 @@
-import React, {
-  useEffect,
-  useMemo,
-  useState,
-  KeyboardEvent,
-  useRef,
-  useLayoutEffect,
-} from "react";
-import { motion, AnimatePresence, Transition } from "framer-motion";
-import ReaderFooter from "./ReaderFooter";
-import "./Reader.css";
+import React, { useState, useEffect, useRef, useCallback } from "react";
+import { ReactReader, ReactReaderStyle } from "react-reader";
 import ReaderHeader from "./ReaderHeader";
+import "./Reader.css";
 
 const Icons = {
   Library: () => (
@@ -35,461 +27,627 @@ const Icons = {
       <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" />
     </svg>
   ),
-  ChevronLeft: () => (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-      <polyline points="15 18 9 12 15 6" />
-    </svg>
-  ),
-  ChevronRight: () => (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-      <polyline points="9 18 15 12 9 6" />
-    </svg>
-  ),
   Menu: () => (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-      <circle cx="12" cy="12" r="1" />
-      <circle cx="12" cy="5" r="1" />
-      <circle cx="12" cy="19" r="1" />
+      <line x1="3" y1="12" x2="21" y2="12"></line>
+      <line x1="3" y1="6" x2="21" y2="6"></line>
+      <line x1="3" y1="18" x2="21" y2="18"></line>
     </svg>
   ),
+  Headphones: () => (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <path d="M3 18v-6a9 9 0 0 1 18 0v6" />
+      <path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z" />
+    </svg>
+  ),
+  Stop: () => (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+       <rect x="6" y="6" width="12" height="12" rx="2" ry="2" />
+    </svg>
+  ),
+  Close: () => (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <line x1="18" y1="6" x2="6" y2="18"></line>
+      <line x1="6" y1="6" x2="18" y2="18"></line>
+    </svg>
+  ),
+  Trash: () => (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <polyline points="3 6 5 6 21 6"></polyline>
+      <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+    </svg>
+  )
 };
 
-function htmlToPlainText(html: string): string {
-  if (!html) return "";
-  let text = html;
-  text = text.replace(
-    /<h[1-6][^>]*>([\s\S]*?)<\/h[1-6]>/gi,
-    (_, inner) => `\n\n${inner.trim()}\n\n`
-  );
-  text = text.replace(/<\/p>/gi, "\n\n");
-  text = text.replace(/<br\s*\/?>/gi, "\n");
-  text = text.replace(/<[^>]+>/g, "");
-  text = text.replace(/\r\n/g, "\n");
-  text = text.replace(/\n{3,}/g, "\n\n");
-  return text.trim();
+interface Selection {
+  cfiRange: string;
+  text: string;
+  color: string;
 }
-
-function escapeRegExp(str: string): string {
-  return str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-}
-
-// ANIMACIONES
-const pageVariants = {
-  enter: (direction: number) => ({
-    x: direction > 0 ? "100%" : "-100%",
-    opacity: 0,
-  }),
-  center: {
-    x: 0,
-    opacity: 1,
-  },
-  exit: (direction: number) => ({
-    x: direction < 0 ? "100%" : "-100%",
-    opacity: 0,
-  }),
-};
-
-const pageTransition: Transition = {
-  type: "tween",
-  ease: "easeInOut",
-  duration: 0.8,
-};
 
 interface ReaderProps {
-  /** Título del LIBRO (para el header y fallback) */
+  url: string;
   title: string;
   author?: string;
-  contentHtml?: string;
-  content?: string;
-  initialLocation?: number;
-  onLocationChange?: (location: number) => void;
-
-  /** Título del CAPÍTULO (lo que quieres mostrar dentro del Reader) */
-  chapterTitle?: string;
-
-  /** Pedir capítulo siguiente/anterior al padre */
-  onRequestNextChapter?: () => void;
-  onRequestPrevChapter?: () => void;
-
-  /** Indica si hay capítulo anterior/siguiente (para mostrar/ocultar flechas) */
-  hasNextChapter?: boolean;
-  hasPrevChapter?: boolean;
+  bookId?: string;
 }
 
-const Reader: React.FC<ReaderProps> = ({
-  title,
-  author,
-  contentHtml,
-  content,
-  initialLocation = 0,
-  onLocationChange,
-  chapterTitle,
-  onRequestNextChapter,
-  onRequestPrevChapter,
-  hasNextChapter = false,
-  hasPrevChapter = false,
-}) => {
+interface TocItem {
+  label: string;
+  href: string;
+  subitems?: TocItem[];
+}
+
+interface SearchResult {
+  cfi: string;
+  excerpt: string;
+}
+
+const Reader: React.FC<ReaderProps> = ({ url, title, bookId }) => {
+  const [location, setLocation] = useState<string | number>(() => {
+    if (bookId) {
+      const saved = localStorage.getItem(`book-progress-${bookId}`);
+      return saved || 0;
+    }
+    return 0;
+  });
+
   const [theme, setTheme] = useState<"light" | "sepia" | "dark">("light");
+  const [fontSize, setFontSize] = useState(100); 
+  const [fontFamily, setFontFamily] = useState("Merriweather");
+  const [lineHeight, setLineHeight] = useState(1.5);
+  const [margin, setMargin] = useState(10);
+  const [showSettings, setShowSettings] = useState(false);
 
-  const [[pageIndex, direction], setPage] = useState<[number, number]>([0, 0]);
-  const [pages, setPages] = useState<string[]>([]);
+  const [isSpeaking, setIsSpeaking] = useState(false);
+  const [toc, setToc] = useState<TocItem[]>([]);
+  const [showToc, setShowToc] = useState(false);
+  
+  // Header visibility state
+  const [showHeader, setShowHeader] = useState(true);
+  
+  // Search State
+  const [showSearch, setShowSearch] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
 
-  const pageContainerRef = useRef<HTMLDivElement | null>(null);
-  const measureRef = useRef<HTMLDivElement | null>(null);
-  const titleRef = useRef<HTMLHeadingElement | null>(null);
+  const [selections, setSelections] = useState<Selection[]>(() => {
+    if (bookId) {
+      const saved = localStorage.getItem(`book-highlights-${bookId}`);
+      return saved ? JSON.parse(saved) : [];
+    }
+    return [];
+  });
 
-  const [viewportWidth, setViewportWidth] = useState(window.innerWidth);
-  const [titleReservedHeight, setTitleReservedHeight] = useState(0);
+  const [selectionMenu, setSelectionMenu] = useState<{
+    show: boolean;
+    x: number;
+    y: number;
+    cfiRange: string;
+    text: string;
+  } | null>(null);
 
-  useEffect(() => {
-    const handleResize = () => setViewportWidth(window.innerWidth);
-    window.addEventListener("resize", handleResize);
-    return () => window.removeEventListener("resize", handleResize);
+  const renditionRef = useRef<any>(null); 
+  const bookRef = useRef<any>(null); 
+  const mouseMoveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Function to handle mouse movement and show/hide header
+  const handleMouseMove = useCallback((e?: MouseEvent) => {
+    // If movement is near the top, show header immediately
+    if (e && e.clientY < 80) {
+      setShowHeader(true);
+    } 
+    // Otherwise, general movement keeps it visible if it was hidden by timeout
+    // But logic is: show on move, hide if no move or specific action?
+    // Requirement: "Show when moving mouse or touching edge"
+    
+    // Let's simplify: Show header on any mouse move, set timeout to hide it?
+    // No, requirement says: "Hide when user starts reading or clicks center" and "Show when moving mouse or touching edge"
+    
+    setShowHeader(true);
+    
+    // Clear existing timeout
+    /* if (mouseMoveTimeoutRef.current) {
+      clearTimeout(mouseMoveTimeoutRef.current);
+    } */
+    
+    // Optionally auto-hide after few seconds of inactivity?
+    // The prompt implies manual hiding mostly by reading action, but let's stick to prompt:
+    // "Hide ... when user starts reading or clicks center" -> Action based
+    // "Show ... when moving mouse" -> Action based
+    
   }, []);
 
-  const rawContent = useMemo(
-    () => contentHtml || content || "",
-    [contentHtml, content]
-  );
-  const normalizedContent = useMemo(
-    () => htmlToPlainText(rawContent),
-    [rawContent]
-  );
+  // Effect to attach global mouse move listener
+  useEffect(() => {
+    window.addEventListener('mousemove', handleMouseMove);
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+    };
+  }, [handleMouseMove]);
 
-  // Quitar del contenido el título de capítulo si viene repetido dentro del texto.
-  const contentForPagination = useMemo(() => {
-    if (!chapterTitle) return normalizedContent;
 
-    const heading = chapterTitle.trim();
-    if (!heading) return normalizedContent;
+  const locationChanged = (epubcifi: string | number) => {
+    setLocation(epubcifi);
+    if (bookId && epubcifi) {
+      localStorage.setItem(`book-progress-${bookId}`, epubcifi.toString());
+    }
+    // Hiding header when location changes (user is "reading" / navigating)
+    // setShowHeader(false); // Optional: aggressive hiding on page turn
+  };
 
-    const pattern = new RegExp(
-      "^\\s*" + escapeRegExp(heading) + "\\s*\\n+",
-      "i"
-    );
+  const toggleSettings = () => {
+    setShowSettings(!showSettings);
+    setShowToc(false);
+    setShowSearch(false);
+  };
 
-    return normalizedContent.replace(pattern, "").trimStart();
-  }, [normalizedContent, chapterTitle]);
+  const changeTheme = (newTheme: "light" | "sepia" | "dark") => {
+    setTheme(newTheme);
+  };
 
-  // Medir dinámicamente cuánto espacio ocupa el título dentro del contenedor
-  useLayoutEffect(() => {
-    const pageEl = pageContainerRef.current;
-    const titleEl = titleRef.current;
+  const toggleToc = () => {
+    setShowToc(!showToc);
+    setShowSettings(false);
+    setShowSearch(false);
+  };
 
-    if (!pageEl || !titleEl || pageIndex !== 0) {
-      setTitleReservedHeight(0);
+  const toggleSearch = () => {
+    setShowSearch(!showSearch);
+    setShowSettings(false);
+    setShowToc(false);
+  };
+
+  const handleTocClick = (href: string) => {
+    setLocation(href); 
+    setShowToc(false); 
+  };
+
+  // Perform search (doSearch)
+  const doSearch = async (q: string) => {
+    if (!q.trim() || !bookRef.current) return;
+
+    setIsSearching(true);
+    setSearchResults([]); 
+
+    try {
+        const spineItems = bookRef.current.spine.spineItems;
+        const resultsArray: any[] = [];
+
+        for (const item of spineItems) {
+            try {
+                await item.load(bookRef.current.load.bind(bookRef.current));
+                const itemResults = item.find(q);
+                item.unload();
+
+                if (itemResults && itemResults.length > 0) {
+                    resultsArray.push(...itemResults);
+                }
+            } catch (err) {
+                console.warn(`Error searching in item ${item.idref}`, err);
+            }
+        }
+        
+        const formattedResults = resultsArray.map(result => ({
+            cfi: result.cfi,
+            excerpt: result.excerpt.trim()
+        }));
+        
+        setSearchResults(formattedResults);
+
+    } catch (error) {
+        console.error("Search failed:", error);
+    } finally {
+        setIsSearching(false);
+    }
+  };
+
+  const handleSearchSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    doSearch(searchQuery);
+  };
+
+  const handleSearchResultClick = (cfi: string) => {
+    setLocation(cfi);
+  };
+
+  // Update Styles
+  useEffect(() => {
+    if (renditionRef.current) {
+      renditionRef.current.themes.fontSize(`${fontSize}%`);
+      renditionRef.current.themes.font(fontFamily);
+
+       const iframeStyles = {
+        body: { 
+          color: theme === "dark" ? "#dedede" : (theme === "sepia" ? "#5b4636" : "#111"), 
+          background: theme === "dark" ? "#111" : (theme === "sepia" ? "#f4ecd8" : "#fff"),
+          'padding-top': '40px !important', 
+          'line-height': `${lineHeight} !important`,
+          'padding-left': `${margin}px !important`,
+          'padding-right': `${margin}px !important`,
+        },
+        'h1, h2, h3': {
+          'margin-top': '60px !important' 
+        },
+        ".epubjs-hl": {
+           "fill": "yellow", "fill-opacity": "0.3", "mix-blend-mode": "multiply"
+        }
+      };
+      
+      renditionRef.current.themes.register("custom", iframeStyles);
+      renditionRef.current.themes.select("custom");
+    }
+  }, [fontSize, fontFamily, theme, lineHeight, margin]);
+
+
+  const addHighlight = (color: string) => {
+    if (!selectionMenu || !renditionRef.current) return;
+
+    const newSelection = {
+      cfiRange: selectionMenu.cfiRange,
+      text: selectionMenu.text,
+      color: color
+    };
+
+    renditionRef.current.annotations.add("highlight", selectionMenu.cfiRange, {}, undefined, `hl-${color}`);
+    
+    const updatedSelections = [...selections, newSelection];
+    setSelections(updatedSelections);
+    
+    if (bookId) {
+      localStorage.setItem(`book-highlights-${bookId}`, JSON.stringify(updatedSelections));
+    }
+
+    setSelectionMenu(null);
+    const selection = window.getSelection();
+    selection?.removeAllRanges();
+  };
+
+
+  const handleToggleSpeech = () => {
+    const synth = window.speechSynthesis;
+    if (isSpeaking) {
+      synth.cancel();
+      setIsSpeaking(false);
       return;
     }
-
-    const pageRect = pageEl.getBoundingClientRect();
-    const titleRect = titleEl.getBoundingClientRect();
-
-    // Altura del título (incluyendo su posición relativa dentro del contenedor)
-    const bottomWithin = titleRect.bottom - pageRect.top;
-    const reserved = Math.min(
-      Math.max(bottomWithin, 0),
-      pageEl.clientHeight
-    );
-
-    setTitleReservedHeight(reserved);
-  }, [viewportWidth, chapterTitle, pageIndex]);
-
-  // Reader.tsx (dentro del componente)
-
-  // PAGINACIÓN
-  useLayoutEffect(() => {
-    const pageEl = pageContainerRef.current;
-    const measureEl = measureRef.current;
-    if (!pageEl || !measureEl) return;
-
-    const containerHeight = pageEl.clientHeight;
-    const containerWidth = pageEl.clientWidth;
-
-    if (containerHeight === 0 || containerWidth === 0) return;
-
-    // Detectar modo columnas (PC/Tablet horizontal)
-    const isTwoColumnMode = containerWidth > 850;
-
-    // Altura total "lógica" disponible para texto en una página normal
-    // Si hay 2 columnas, cabe el doble de texto (aprox)
-    let targetHeight = containerHeight;
-
-    if (isTwoColumnMode) {
-      const gap = 60; // Debe coincidir con CSS
-      const colWidth = (containerWidth - gap) / 2;
-      measureEl.style.width = `${colWidth}px`;
-      // Multiplicador un poco menor a 2 para margen de seguridad en columnas
-      targetHeight = containerHeight * 1.9;
-    } else {
-      measureEl.style.width = `${containerWidth}px`;
-      targetHeight = containerHeight;
-    }
-
-    measureEl.style.height = "auto";
-
-    const text = contentForPagination;
-    const totalLength = text.length;
-
-    if (totalLength === 0) {
-      setPages([]);
-      setPage([0, 0]);
-      return;
-    }
-
-    if (containerHeight < 50) return;
-
-    const newPages: string[] = [];
-    let start = 0;
-
-    // ---------------------------------------------------------
-    // 1) CÁLCULO DE LA PRIMERA PÁGINA (SOLUCIÓN AL CORTE)
-    // ---------------------------------------------------------
-    {
-      // Estimamos cuánto ocupa el Título + Margen en píxeles.
-      // Es mejor sobreestimar (200px) que quedarse corto.
-      const ESTIMATED_TITLE_HEIGHT = 180;
-
-      // Calculamos la altura disponible REAL de una columna en la pág 1
-      const availableColHeight = containerHeight - ESTIMATED_TITLE_HEIGHT;
-
-      // Si estamos en 2 columnas, el texto llena la col izquierda Y la derecha
-      // reducidas ambas por el título.
-      const firstPageCapacity = isTwoColumnMode
-        ? (availableColHeight * 2) // Llenamos 2 columnas recortadas
-        : availableColHeight;      // Llenamos 1 columna recortada
-
-      // Aplicamos un buffer de seguridad extra (unos 40px para evitar líneas viudas al final)
-      const SAFE_FIRST_PAGE_HEIGHT = Math.max(firstPageCapacity - 40, 100);
-
-      let low = start + 1;
-      let high = totalLength;
-      let best = low;
-
-      // Búsqueda binaria para ver cuánto texto cabe en ese espacio reducido
-      while (low <= high) {
-        const mid = Math.floor((low + high) / 2);
-        measureEl.textContent = text.slice(start, mid);
-
-        // IMPORTANTE: Comparamos contra la capacidad reducida
-        if (measureEl.scrollHeight <= SAFE_FIRST_PAGE_HEIGHT) {
-          best = mid;
-          low = mid + 1;
-        } else {
-          high = mid - 1;
-        }
-      }
-
-      // Ajuste fino: no cortar palabras a la mitad
-      let end = best;
-      if (end < totalLength) {
-        const lastSpace = text.lastIndexOf(" ", end);
-        // Si el espacio está razonablemente cerca, cortar ahí
-        if (lastSpace > start + (end - start) * 0.8) {
-          end = lastSpace + 1;
-        }
-      }
-      if (end <= start) end = start + 1;
-
-      newPages.push(text.slice(start, end));
-      start = end;
-    }
-
-    // ---------------------------------------------------------
-    // 2) RESTO DE PÁGINAS (Altura completa)
-    // ---------------------------------------------------------
-    // Margen de seguridad para páginas normales (evita cortar la última línea)
-    const NORMAL_PAGE_SAFETY = 30;
-    const normalPageTarget = targetHeight - NORMAL_PAGE_SAFETY;
-
-    while (start < totalLength) {
-      let low = start + 1;
-      let high = totalLength;
-      let best = low;
-
-      while (low <= high) {
-        const mid = Math.floor((low + high) / 2);
-        measureEl.textContent = text.slice(start, mid);
-        if (measureEl.scrollHeight <= normalPageTarget) {
-          best = mid;
-          low = mid + 1;
-        } else {
-          high = mid - 1;
-        }
-      }
-
-      let end = best;
-      if (end < totalLength) {
-        const lastSpace = text.lastIndexOf(" ", end);
-        if (lastSpace > start + (end - start) * 0.8) {
-          end = lastSpace + 1;
-        }
-      }
-      if (end <= start) end = start + 1;
-
-      newPages.push(text.slice(start, end));
-      start = end;
-    }
-
-    setPages(newPages);
-
-    // Mantener la página actual válida si cambia el tamaño
-    setPage((prev) => {
-      const currentP = prev[0];
-      if (newPages.length === 0) return [0, 0];
-      const newP = Math.min(currentP, newPages.length - 1);
-      return [newP, 0];
-    });
-  }, [contentForPagination, viewportWidth]); // Quitamos titleReservedHeight de dependencias
-  // initialLocation
-  useEffect(() => {
-    if (pages.length === 0) return;
-    const total = pages.length;
-    const targetPage = Math.floor(initialLocation * (total - 1));
-    setPage([Math.min(total - 1, Math.max(0, targetPage)), 0]);
-  }, [initialLocation, pages.length]);
-
-  // Notificar progreso
-  useEffect(() => {
-    if (!onLocationChange || pages.length === 0) return;
-    const loc = pages.length === 1 ? 1 : pageIndex / (pages.length - 1);
-    onLocationChange(loc);
-  }, [pageIndex, pages.length, onLocationChange]);
-
-  // --- CAMBIO DE PÁGINA / CAPÍTULO ---
-  const paginate = (newDirection: number) => {
-    if (newDirection === 0 || pages.length === 0) return;
-
-    const newIndex = pageIndex + newDirection;
-
-    if (newDirection > 0) {
-      if (newIndex < pages.length) {
-        setPage([newIndex, newDirection]);
-      } else if (onRequestNextChapter) {
-        onRequestNextChapter();
-      }
-    } else {
-      if (newIndex >= 0) {
-        setPage([newIndex, newDirection]);
-      } else if (onRequestPrevChapter) {
-        onRequestPrevChapter();
+    if (renditionRef.current) {
+      const visibleRange = renditionRef.current.getRange(renditionRef.current.currentLocation().start.cfi);
+      const textToRead = visibleRange.toString();
+      if (textToRead) {
+        const utterance = new SpeechSynthesisUtterance(textToRead);
+        utterance.lang = "es-ES";
+        utterance.onend = () => setIsSpeaking(false);
+        utterance.onerror = () => setIsSpeaking(false);
+        synth.speak(utterance);
+        setIsSpeaking(true);
       }
     }
   };
 
-  const handleKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
-    if (e.key === "ArrowRight" || e.key === " ") {
-      e.preventDefault();
-      paginate(1);
-    }
-    if (e.key === "ArrowLeft") {
-      e.preventDefault();
-      paginate(-1);
-    }
+  useEffect(() => {
+    return () => {
+      window.speechSynthesis.cancel();
+    };
+  }, []);
+
+  const containerStyles = {
+    ...ReactReaderStyle.container,
+    // Adjust top to be 0 so it fills the space, we'll manage padding/overlap if needed
+    // But header overlays now, so 0 is fine.
+    top: 0, 
+    bottom: 30,
+    transition: 'top 0.3s ease-in-out'
   };
-
-  const progressPercent =
-    pages.length <= 1 ? 100 : Math.round((pageIndex / (pages.length - 1)) * 100);
-  const currentText = pages[pageIndex] || "";
-
-  const cycleTheme = () =>
-    setTheme((t) => (t === "light" ? "sepia" : t === "sepia" ? "dark" : "light"));
-
-  const canGoPrevPage = pageIndex > 0;
-  const canGoNextPage = pageIndex < pages.length - 1;
-
-  const showPrevArrow = canGoPrevPage || hasPrevChapter;
-  const showNextArrow = canGoNextPage || hasNextChapter;
-
-  const chapterHeading = (chapterTitle || title)?.toUpperCase();
 
   return (
-    <div
-      className={`reader reader--${theme}`}
-      tabIndex={0}
-      onKeyDown={handleKeyDown}
-    >
-      <ReaderHeader title={title} onToggleTheme={cycleTheme} Icons={Icons} />
-
-      <main className="reader-main">
-        <button
-          className="reader-nav-btn reader-nav-prev"
-          onClick={() => paginate(-1)}
-          style={{ visibility: showPrevArrow ? "visible" : "hidden" }}
-        >
-          <Icons.ChevronLeft />
-        </button>
-
-        <div className="reader-page-container" ref={pageContainerRef}>
-          {showPrevArrow && (
-            <div
-              style={{
-                position: "absolute",
-                left: 0,
-                top: 0,
-                bottom: 0,
-                width: "20%",
-                zIndex: 5,
-                cursor: "pointer",
-              }}
-              onClick={() => paginate(-1)}
-            />
-          )}
-          {showNextArrow && (
-            <div
-              style={{
-                position: "absolute",
-                right: 0,
-                top: 0,
-                bottom: 0,
-                width: "20%",
-                zIndex: 5,
-                cursor: "pointer",
-              }}
-              onClick={() => paginate(1)}
-            />
-          )}
-
-          <AnimatePresence initial={false} custom={direction} mode="popLayout">
-            <motion.div
-              key={pageIndex}
-              custom={direction}
-              variants={pageVariants}
-              initial="enter"
-              animate="center"
-              exit="exit"
-              transition={pageTransition}
-              className="reader-animated-page"
-            >
-              {pageIndex === 0 && chapterHeading && (
-                <h1 ref={titleRef} className="reader-chapter-title">
-                  {chapterHeading}
-                </h1>
-              )}
-
-              <p className="reader-text">{currentText}</p>
-            </motion.div>
-          </AnimatePresence>
-        </div>
-
-        <button
-          className="reader-nav-btn reader-nav-next"
-          onClick={() => paginate(1)}
-          style={{ visibility: showNextArrow ? "visible" : "hidden" }}
-        >
-          <Icons.ChevronRight />
-        </button>
-      </main>
-
-      <ReaderFooter
-        progressPercent={progressPercent}
-        pageIndex={pageIndex}
-        totalPages={pages.length}
-        estimatedMinutes={Math.ceil((pages.length - pageIndex) * 1.5)}
+    <div className={`reader reader--${theme}`} style={{ height: "100vh", display: "flex", flexDirection: "column", position: 'relative', overflow: 'hidden' }}>
+      <ReaderHeader
+        title={title} 
+        onToggleTheme={toggleSettings} 
+        onToggleMenu={toggleToc} 
+        onToggleSearch={toggleSearch}
+        onToggleSpeech={handleToggleSpeech}
+        isSpeaking={isSpeaking}
+        isVisible={showHeader}
+        Icons={Icons}
       />
 
-      <div ref={measureRef} className="reader-measure" aria-hidden="true" />
+      {/* SEARCH SIDEBAR (Panel Lateral) */}
+      <div className={`reader-search-sidebar ${showSearch ? 'open' : ''} reader--${theme}`}>
+         <div className="reader-search-header">
+            <h2>Buscar</h2>
+            <button onClick={() => setShowSearch(false)} className="reader-search-close">
+               <Icons.Close />
+            </button>
+         </div>
+         <div className="reader-search-input-container">
+            <form onSubmit={handleSearchSubmit}>
+                <div className="reader-search-box">
+                    <input 
+                        type="text" 
+                        placeholder="Buscar en el libro..." 
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        className="reader-search-input"
+                    />
+                    <button type="submit" className="reader-search-btn-icon" disabled={isSearching}>
+                        {isSearching ? <span className="loader">...</span> : <Icons.Search />}
+                    </button>
+                </div>
+            </form>
+         </div>
+         <div className="reader-search-results">
+            {searchResults.length === 0 && !isSearching && searchQuery && isSearching === false && (
+                <p className="no-results">No se encontraron resultados.</p>
+            )}
+            {searchResults.map((result, idx) => (
+                <div key={idx} className="search-result-item" onClick={() => handleSearchResultClick(result.cfi)}>
+                    <p>...{result.excerpt}...</p>
+                </div>
+            ))}
+         </div>
+      </div>
+      
+      {/* OVERLAY for Search (same as TOC) */}
+      <div className={`reader-toc-overlay ${showSearch ? 'open' : ''}`} onClick={() => setShowSearch(false)}></div>
+
+
+      {/* SETTINGS PANEL (Aa) */}
+      {showSettings && (
+        <div className="reader-settings-panel">
+          <div className="reader-settings-row">
+            <span>Tema</span>
+            <div className="reader-theme-toggles">
+              <button 
+                className={`theme-btn light ${theme === 'light' ? 'active' : ''}`} 
+                onClick={() => changeTheme('light')}
+              >Aa</button>
+              <button 
+                className={`theme-btn sepia ${theme === 'sepia' ? 'active' : ''}`} 
+                onClick={() => changeTheme('sepia')}
+              >Aa</button>
+              <button 
+                className={`theme-btn dark ${theme === 'dark' ? 'active' : ''}`} 
+                onClick={() => changeTheme('dark')}
+              >Aa</button>
+            </div>
+          </div>
+
+          <div className="reader-settings-row">
+             <span>Fuente</span>
+             <div className="reader-font-controls">
+                <button onClick={() => setFontSize(Math.max(80, fontSize - 10))}>A-</button>
+                <span>{fontSize}%</span>
+                <button onClick={() => setFontSize(Math.min(200, fontSize + 10))}>A+</button>
+             </div>
+          </div>
+
+          <div className="reader-settings-row">
+            <span>Tipo</span>
+            <select 
+              value={fontFamily} 
+              onChange={(e) => setFontFamily(e.target.value)}
+              className="reader-font-select"
+            >
+              <option value="Merriweather">Merriweather (Serif)</option>
+              <option value="Helvetica, Arial, sans-serif">Sans-Serif</option>
+              <option value="Georgia, serif">Georgia</option>
+              <option value="OpenDyslexic">OpenDyslexic</option>
+            </select>
+          </div>
+
+          <div className="reader-settings-row">
+             <span>Interlineado</span>
+             <div className="reader-font-controls">
+                <button onClick={() => setLineHeight(Math.max(1, lineHeight - 0.1))}>-</button>
+                <span>{lineHeight.toFixed(1)}</span>
+                <button onClick={() => setLineHeight(Math.min(3, lineHeight + 0.1))}>+</button>
+             </div>
+          </div>
+
+          <div className="reader-settings-row">
+             <span>Márgenes</span>
+             <div className="reader-font-controls">
+                <button onClick={() => setMargin(Math.max(0, margin - 10))}>-</button>
+                <span>{margin}px</span>
+                <button onClick={() => setMargin(Math.min(100, margin + 10))}>+</button>
+             </div>
+          </div>
+        </div>
+      )}
+
+      {selectionMenu && (
+        <div className="reader-selection-menu">
+           <button className="reader-hl-btn yellow" onClick={() => addHighlight("yellow")} />
+           <button className="reader-hl-btn green" onClick={() => addHighlight("green")} />
+           <button className="reader-hl-btn pink" onClick={() => addHighlight("pink")} />
+           <button className="reader-hl-btn blue" onClick={() => addHighlight("blue")} />
+           <div className="divider" />
+           <button className="reader-hl-action" onClick={() => {
+               navigator.clipboard.writeText(selectionMenu.text);
+               setSelectionMenu(null);
+           }}>Copiar</button>
+        </div>
+      )}
+
+      <div className={`reader-toc-overlay ${showToc ? 'open' : ''}`} onClick={() => setShowToc(false)}></div>
+      <div className={`reader-toc-sidebar ${showToc ? 'open' : ''} reader--${theme}`}>
+        <div className="reader-toc-header">
+          <h2>Contenido</h2>
+          <button onClick={() => setShowToc(false)} className="reader-toc-close">
+            <Icons.Close />
+          </button>
+        </div>
+        <ul className="reader-toc-list">
+          {toc.map((item, index) => (
+            <li key={index} className="reader-toc-item" onClick={() => handleTocClick(item.href)}>
+              {item.label}
+            </li>
+          ))}
+          {toc.length === 0 && <li className="p-4 text-sm opacity-70">Cargando índice...</li>}
+        </ul>
+      </div>
+
+      <div style={{ flex: 1, position: "relative" }}>
+        <ReactReader
+          url={url}
+          location={location}
+          locationChanged={locationChanged}
+          tocChanged={(toc) => setToc(toc)}
+          getRendition={(rendition) => {
+            renditionRef.current = rendition;
+            bookRef.current = rendition.book; 
+            
+            rendition.hooks.content.register((contents: any) => {
+              // Handle click inside iframe to toggle header
+              const doc = contents.document;
+              const body = doc.body;
+              
+              // We attach a click listener to the body of the book iframe
+              body.addEventListener('click', (e: any) => {
+                 // Simple logic: Toggle visibility on center click or hide on reading interaction
+                 // If we want to detect "center" click specifically vs just "any" click that might be a page turn
+                 // epub.js usually handles page turns on sides. 
+                 
+                 // Let's try to detect if it's a link or selection first? 
+                 // If just a click on text/background:
+                 
+                 // Determine click position relative to width
+                 const width = window.innerWidth;
+                 const x = e.clientX;
+                 
+                 // Central 30%?
+                 const isCenter = x > width * 0.3 && x < width * 0.7;
+                 
+                 if (isCenter) {
+                    setShowHeader(prev => !prev);
+                 } else {
+                    // Side clicks might be page turns, usually we hide header on reading
+                    setShowHeader(false);
+                 }
+              });
+              
+              // Also handle mouse move inside iframe to show header if near top
+               body.addEventListener('mousemove', (e: any) => {
+                   if (e.clientY < 80) { // Near top
+                       setShowHeader(true);
+                   } else {
+                       // Optionally handle general movement inside iframe to show it?
+                       // The outer window listener handles outer movement.
+                       // For consistent experience:
+                       setShowHeader(true); 
+                   }
+               });
+
+              const fontFace = `
+                @font-face {
+                  font-family: 'OpenDyslexic';
+                  src: url('https://cdnjs.cloudflare.com/ajax/libs/opendyslexic/0.91.0/fonts/OpenDyslexic-Regular.otf') format("opentype");
+                  font-weight: normal;
+                  font-style: normal;
+                }
+                @font-face {
+                  font-family: 'OpenDyslexic';
+                  src: url('https://cdnjs.cloudflare.com/ajax/libs/opendyslexic/0.91.0/fonts/OpenDyslexic-Bold.otf') format("opentype");
+                  font-weight: bold;
+                  font-style: normal;
+                }
+              `;
+              const style = contents.document.createElement('style');
+              style.innerHTML = fontFace;
+              contents.document.head.appendChild(style);
+
+              contents.addStylesheetRules({
+                 "body": { "padding-top": "0 !important" }, // Reset padding since header is overlay now
+                 "h1": { "margin-top": "60pt !important" },
+                 "h2": { "margin-top": "60pt !important" },
+                 ".chapter-title": { "margin-top": "60pt !important" },
+                 
+                 ".hl-yellow": { "fill": "#fde047 !important", "fill-opacity": "0.3 !important", "mix-blend-mode": "multiply !important" },
+                 ".hl-green": { "fill": "#86efac !important", "fill-opacity": "0.3 !important", "mix-blend-mode": "multiply !important" },
+                 ".hl-pink": { "fill": "#f9a8d4 !important", "fill-opacity": "0.3 !important", "mix-blend-mode": "multiply !important" },
+                 ".hl-blue": { "fill": "#93c5fd !important", "fill-opacity": "0.3 !important", "mix-blend-mode": "multiply !important" }
+              });
+            });
+            
+            rendition.themes.fontSize(`${fontSize}%`);
+            rendition.themes.font(fontFamily);
+            
+            const iframeStyles = {
+                body: { 
+                  color: theme === "dark" ? "#dedede" : (theme === "sepia" ? "#5b4636" : "#111"), 
+                  background: theme === "dark" ? "#111" : (theme === "sepia" ? "#f4ecd8" : "#fff"),
+                  'line-height': `${lineHeight} !important`,
+                  'padding-left': `${margin}px !important`,
+                  'padding-right': `${margin}px !important`,
+                  'padding-top': '60px !important', // Add padding to body so content isn't hidden under overlay header initially
+                }
+            };
+            rendition.themes.register("custom", iframeStyles);
+            rendition.themes.select("custom");
+
+            rendition.on("selected", (cfiRange: string, contents: any) => {
+              const range = rendition.getRange(cfiRange);
+              const text = range ? range.toString() : "";
+
+              setSelectionMenu({
+                show: true,
+                x: 0, 
+                y: 0,
+                cfiRange,
+                text
+              });
+            });
+
+            rendition.on("click", () => setSelectionMenu(null));
+            rendition.on("relocated", () => setSelectionMenu(null));
+
+            selections.forEach(sel => {
+               const colorClass = sel.color ? `hl-${sel.color}` : "hl-yellow";
+               rendition.annotations.add("highlight", sel.cfiRange, {}, undefined, colorClass);
+            });
+          }}
+          
+          readerStyles={theme === "dark" ? { ...darkReaderStyles, container: { ...darkReaderStyles.container, ...containerStyles } } : { ...lightReaderStyles, container: { ...lightReaderStyles.container, ...containerStyles } }}
+          
+          epubOptions={{
+            flow: "paginated",
+            manager: "default",
+          }}
+        />
+      </div>
     </div>
   );
+};
+
+const lightReaderStyles = {
+  ...ReactReaderStyle,
+  arrow: {
+    ...ReactReaderStyle.arrow,
+    color: "#555",
+  },
+};
+
+const darkReaderStyles = {
+  ...ReactReaderStyle,
+  arrow: {
+    ...ReactReaderStyle.arrow,
+    color: "#dedede",
+  },
+  container: {
+    ...ReactReaderStyle.container,
+    backgroundColor: "#111",
+  },
+  titleArea: {
+    ...ReactReaderStyle.titleArea,
+    color: "#dedede",
+  },
+  tocArea: {
+    ...ReactReaderStyle.tocArea,
+    background: "#111",
+  },
 };
 
 export default Reader;
