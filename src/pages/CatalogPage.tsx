@@ -3,9 +3,9 @@ import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import Navbar from "../components/layout/Navbar";
 import Footer from "../components/layout/Footer";
+import { BookOpen, Star, Tag, Clock, Search } from "lucide-react";
 
-const API_BASE_URL =
-  "https://5000-firebase-hreads-back-1763343106367.cluster-dwvm25yncracsxpd26rcd5ja3m.cloudworkstations.dev";
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
 
 interface ApiBook {
   id: string;
@@ -22,8 +22,8 @@ interface Book {
   description: string;
   coverUrl: string;
   tag: string;
-  reads: number;   // simulado
-  isFree: boolean; // simulado
+  reads: number;
+  isFree: boolean;
 }
 
 type CatalogFilter = "todos" | "populares" | "gratis";
@@ -38,23 +38,49 @@ const CatalogPage: React.FC = () => {
     setLoading(true);
     setError(null);
 
-    fetch(`${API_BASE_URL}/api/books`)
+    // Normalizar base URL
+    const base = API_BASE_URL ? API_BASE_URL.replace(/\/$/, "") : "";
+    const url = base ? `${base}/api/books` : "/api/books";
+
+    fetch(url)
       .then((res) => {
         if (!res.ok) throw new Error("No se pudo cargar el catálogo");
         return res.json();
       })
       .then((data: ApiBook[]) => {
-        const mapped: Book[] = data.map((b, index) => ({
-          id: b.id,
-          title: b.title,
-          author: b.author || "Autor desconocido",
-          description: b.description,
-          coverUrl: `${API_BASE_URL}${b.coverUrl}`, // asumiendo que coverUrl empieza con "/"
-          tag: "Clásico adaptado",
-          // simulamos popularidad y “gratis”
-          reads: 150 + (data.length - index) * 17,
-          isFree: index % 4 === 0, // 1 de cada 4 como gratis
-        }));
+        const mapped: Book[] = data.map((b, index) => {
+           // Normalización de URL de portada
+           let finalCoverUrl = b.coverUrl;
+           
+           if (finalCoverUrl && !finalCoverUrl.startsWith("http")) {
+               // Si no es absoluta
+               if (!finalCoverUrl.startsWith("/")) {
+                   // Si no empieza con /, agregamos base/
+                   finalCoverUrl = base ? `${base}/${finalCoverUrl}` : `/covers/${finalCoverUrl}`; 
+                   // Fallback a /covers/ si no hay base definida (dev mode sin backend proxy a veces)
+               } else if (base) {
+                   // Si empieza con /, concatenamos la base
+                   finalCoverUrl = `${base}${finalCoverUrl}`;
+               }
+           }
+           
+           // Patch rápido por si el backend devuelve rutas relativas a public que no deberían verse
+           if (finalCoverUrl && finalCoverUrl.includes("public/")) {
+               finalCoverUrl = finalCoverUrl.replace("public/", "");
+           }
+
+
+          return {
+            id: b.id,
+            title: b.title,
+            author: b.author || "Autor desconocido",
+            description: b.description,
+            coverUrl: finalCoverUrl,
+            tag: "Clásico adaptado",
+            reads: 150 + (data.length - index) * 17, // Datos simulados para demo
+            isFree: index % 4 === 0, // Datos simulados
+          };
+        });
         setBooks(mapped);
       })
       .catch((err) => {
@@ -65,124 +91,143 @@ const CatalogPage: React.FC = () => {
   }, []);
 
   const filteredBooks = (() => {
-    if (filter === "gratis") {
-      return books.filter((b) => b.isFree);
-    }
-    if (filter === "populares") {
-      // ordenamos por lecturas descendente
-      return [...books].sort((a, b) => b.reads - a.reads);
-    }
+    if (filter === "gratis") return books.filter((b) => b.isFree);
+    if (filter === "populares") return [...books].sort((a, b) => b.reads - a.reads);
     return books;
   })();
 
   const getFilterButtonClasses = (active: boolean) =>
-    [
-      "rounded-full px-3 py-1.5 text-xs font-medium transition-colors",
+    `flex items-center gap-2 rounded-full px-4 py-2 text-xs font-medium transition-all duration-300 ${
       active
-        ? "bg-amber-400 text-slate-950"
-        : "border border-slate-700 text-slate-200 hover:border-slate-500 hover:bg-slate-900",
-    ].join(" ");
+        ? "bg-amber-500 text-slate-950 shadow-lg shadow-amber-500/20 ring-2 ring-amber-500/50"
+        : "border border-slate-700 bg-slate-800/50 text-slate-300 hover:border-slate-500 hover:bg-slate-800 hover:text-white"
+    }`;
 
   return (
-    <div className="flex min-h-screen flex-col bg-slate-950 text-slate-50">
+    <div className="flex min-h-screen flex-col bg-slate-950 text-slate-50 font-sans selection:bg-amber-500/30">
       <Navbar />
 
-      <main className="flex-1 border-t border-slate-800 bg-slate-950">
-        <section className="border-b border-slate-800 bg-radial-at-t from-amber-400/10 via-slate-950 to-slate-950">
-          <div className="mx-auto max-w-6xl px-4 py-8 md:py-10">
-            <h1 className="text-2xl font-semibold tracking-tight md:text-3xl">
-              Catálogo completo
+      <main className="flex-1">
+        {/* Hero Section */}
+        <section className="relative overflow-hidden border-b border-slate-800 bg-slate-950 pt-16 pb-20 md:pt-24 md:pb-28">
+           {/* Efectos de fondo */}
+           <div className="absolute top-0 right-1/4 w-[500px] h-[500px] bg-blue-500/10 blur-[120px] rounded-full pointer-events-none" />
+           <div className="absolute bottom-0 left-1/4 w-[500px] h-[300px] bg-amber-500/10 blur-[100px] rounded-full pointer-events-none" />
+
+          <div className="relative mx-auto max-w-6xl px-6 text-center">
+            <h1 className="text-4xl md:text-5xl font-bold tracking-tight text-white mb-6">
+              Catálogo <span className="text-transparent bg-clip-text bg-gradient-to-r from-amber-200 via-amber-400 to-amber-200">Completo</span>
             </h1>
-            <p className="mt-2 max-w-2xl text-sm text-slate-300">
-              Todos los libros de h-equity reads en un solo lugar. Encuentra tu
-              próxima lectura y continúa justo donde la dejaste.
+            <p className="mx-auto max-w-2xl text-lg text-slate-400 leading-relaxed mb-10">
+              Explora nuestra colección completa de clásicos adaptados. 
+              Filtra, busca y descubre tu próxima gran aventura literaria.
             </p>
 
             {/* Filtros */}
-            <div className="mt-5 flex flex-wrap items-center gap-2">
-              <button
-                type="button"
-                onClick={() => setFilter("todos")}
-                className={getFilterButtonClasses(filter === "todos")}
-              >
-                Todos
+            <div className="flex flex-wrap items-center justify-center gap-3">
+              <button onClick={() => setFilter("todos")} className={getFilterButtonClasses(filter === "todos")}>
+                <BookOpen size={14} /> Todos
               </button>
-              <button
-                type="button"
-                onClick={() => setFilter("populares")}
-                className={getFilterButtonClasses(filter === "populares")}
-              >
-                Más populares
+              <button onClick={() => setFilter("populares")} className={getFilterButtonClasses(filter === "populares")}>
+                <Star size={14} /> Más populares
               </button>
-              <button
-                type="button"
-                onClick={() => setFilter("gratis")}
-                className={getFilterButtonClasses(filter === "gratis")}
-              >
-                Gratis
+              <button onClick={() => setFilter("gratis")} className={getFilterButtonClasses(filter === "gratis")}>
+                <Tag size={14} /> Gratis
               </button>
             </div>
           </div>
         </section>
 
-        <section className="border-b border-slate-800 bg-slate-950">
-          <div className="mx-auto max-w-6xl px-4 py-8 md:py-10">
-            {/* Estados de carga / error */}
+        <section className="bg-slate-950 py-16">
+          <div className="mx-auto max-w-7xl px-6">
+            {/* Loading / Error States */}
             {loading && (
-              <div className="py-12 text-center text-sm text-slate-300">
-                Cargando catálogo...
+              <div className="flex flex-col items-center justify-center py-20 space-y-4">
+                <div className="w-12 h-12 border-4 border-amber-500/30 border-t-amber-500 rounded-full animate-spin" />
+                <p className="text-slate-400 text-sm animate-pulse">Cargando biblioteca...</p>
               </div>
             )}
 
             {error && !loading && (
-              <div className="py-12 text-center text-sm text-red-400">
-                {error}
+              <div className="py-12 text-center rounded-2xl bg-red-500/10 border border-red-500/20 text-red-400">
+                <p className="font-semibold">Error de conexión</p>
+                <p className="text-sm mt-1 opacity-80">{error}</p>
               </div>
             )}
 
             {!loading && !error && filteredBooks.length === 0 && (
-              <div className="py-12 text-center text-sm text-slate-400">
-                No encontramos libros para este filtro. Prueba con otra opción.
+              <div className="py-20 text-center">
+                 <Search className="w-16 h-16 mx-auto text-slate-700 mb-4" />
+                 <p className="text-slate-400 text-lg">No encontramos libros con este filtro.</p>
+                 <button onClick={() => setFilter("todos")} className="mt-4 text-amber-500 hover:text-amber-400 text-sm font-medium transition-colors">Ver todos los libros</button>
               </div>
             )}
 
-            {/* Grid de libros */}
+            {/* Books Grid */}
             {!loading && !error && filteredBooks.length > 0 && (
-              <div className="grid gap-5 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
+              <div className="grid gap-x-6 gap-y-12 grid-cols-2 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
                 {filteredBooks.map((book) => (
                   <Link
                     key={book.id}
                     to={`/reader/${book.id}/1`}
                     state={{ book }}
-                    className="group flex flex-col rounded-2xl border border-slate-800 bg-slate-900/60 p-3 hover:border-amber-400/70 hover:bg-slate-900 transition-colors"
+                    className="group relative flex flex-col"
                   >
-                    <div className="relative mb-3">
+                    {/* Cover Image Container */}
+                    <div className="relative aspect-[2/3] w-full overflow-hidden rounded-2xl bg-slate-900 shadow-lg transition-all duration-500 group-hover:-translate-y-2 group-hover:shadow-2xl group-hover:shadow-amber-500/20">
                       <img
                         src={book.coverUrl}
                         alt={book.title}
-                        className="h-48 w-full rounded-xl object-cover"
+                        className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-110"
+                        loading="lazy"
+                        onError={(e) => {
+                            const target = e.currentTarget as HTMLImageElement;
+                            if (!target.src.includes("placeholder")) {
+                                target.src = "/covers/placeholder.jpg"; // Asegura tener un placeholder si falla
+                            }
+                        }}
                       />
-                      {book.isFree && (
-                        <span className="absolute left-2 top-2 rounded-full bg-emerald-400 px-2 py-0.5 text-[11px] font-semibold text-slate-950">
-                          Gratis
-                        </span>
-                      )}
+                      
+                      {/* Overlay on Hover */}
+                      <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/20 to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
+                      
+                      {/* Action Button Overlay */}
+                      <div className="absolute bottom-6 left-0 right-0 flex justify-center opacity-0 transform translate-y-4 transition-all duration-300 group-hover:opacity-100 group-hover:translate-y-0">
+                         <span className="bg-amber-500 text-slate-950 px-6 py-2.5 rounded-full font-bold text-sm shadow-lg hover:bg-amber-400 transition-colors">
+                            Leer ahora
+                         </span>
+                      </div>
+
+                      {/* Badges */}
+                      <div className="absolute top-3 left-3 flex flex-col gap-2">
+                         {book.isFree && (
+                            <span className="backdrop-blur-md bg-emerald-500/90 text-white px-2.5 py-1 rounded-lg text-[10px] font-bold shadow-sm ring-1 ring-white/20">
+                            GRATIS
+                            </span>
+                         )}
+                         {book.reads > 200 && (
+                            <span className="backdrop-blur-md bg-amber-500/90 text-slate-950 px-2.5 py-1 rounded-lg text-[10px] font-bold shadow-sm flex items-center gap-1 ring-1 ring-white/20">
+                            <Star size={10} fill="currentColor" /> POPULAR
+                            </span>
+                         )}
+                      </div>
                     </div>
 
-                    <h2 className="text-sm font-semibold text-slate-50 line-clamp-2">
-                      {book.title}
-                    </h2>
-                    <p className="mt-1 text-xs text-slate-300 line-clamp-1">
-                      {book.author}
-                    </p>
-
-                    <p className="mt-2 text-[11px] text-amber-200/90 line-clamp-2">
-                      {book.tag}
-                    </p>
-
-                    <div className="mt-3 flex items-center justify-between text-[11px] text-slate-400">
-                      <span>Edición adaptada</span>
-                      <span>{book.reads} lecturas</span>
+                    {/* Book Info */}
+                    <div className="mt-5 space-y-1.5 px-1">
+                      <h2 className="text-lg font-bold text-slate-100 leading-tight line-clamp-1 group-hover:text-amber-400 transition-colors">
+                        {book.title}
+                      </h2>
+                      <p className="text-sm text-slate-400 font-medium">{book.author}</p>
+                      
+                      <div className="flex items-center gap-4 mt-2 text-xs text-slate-500">
+                        <span className="flex items-center gap-1.5 bg-slate-900/50 px-2 py-1 rounded-md border border-slate-800">
+                            <BookOpen size={12} className="text-slate-400" /> Adaptado
+                        </span>
+                        <span className="flex items-center gap-1.5 bg-slate-900/50 px-2 py-1 rounded-md border border-slate-800">
+                            <Clock size={12} className="text-slate-400" /> {Math.ceil(book.reads / 20)}m
+                        </span>
+                      </div>
                     </div>
                   </Link>
                 ))}

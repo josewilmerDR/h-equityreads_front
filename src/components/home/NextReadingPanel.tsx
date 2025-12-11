@@ -23,7 +23,9 @@ interface NextReadingPanelProps {
   featuredBooks?: Book[];
 }
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
+// Calculamos la base una vez fuera para usarla en el render, igual que en TopReadBooksSection
+const BASE_URL = API_BASE_URL ? API_BASE_URL.replace(/\/$/, "") : "";
 
 const NextReadingPanel: React.FC<NextReadingPanelProps> = ({
   featuredBooks = [],
@@ -42,7 +44,9 @@ const NextReadingPanel: React.FC<NextReadingPanelProps> = ({
     setLoading(true);
     setError(null);
 
-    fetch(`${API_BASE_URL}/api/books`)
+    const url = BASE_URL ? `${BASE_URL}/api/books` : "/api/books";
+
+    fetch(url)
       .then((res) => {
         if (!res.ok) throw new Error("No se pudo cargar la lista de libros");
         return res.json();
@@ -108,57 +112,73 @@ const NextReadingPanel: React.FC<NextReadingPanelProps> = ({
           {!loading && !error && books.length > 0 && (
             <div className="space-y-3">
               {/* 👇 2) Limitar aquí a solo 3 */}
-              {books.slice(0, 3).map((book) => (
-                <Link
-                  key={book.id}
-                  to={`/reader/${book.id}/1`}
-                  state={{ book }}
-                  className="group flex items-center gap-3 rounded-2xl border border-slate-800/80 bg-slate-950/60 px-3 py-3
-                           hover:border-amber-300/70 hover:bg-slate-900/80 transition-colors cursor-pointer"
-                >
-                  {/* Usamos la clase CSS pura "book-cover-placeholder" */}
-                  <div className="book-cover-placeholder">
-                    {book.coverUrl ? (
-                      <img 
-                        src={book.coverUrl} 
-                        alt={book.title} 
-                        className="h-full w-full object-cover" 
-                      />
-                    ) : (
-                      <span className="text-[10px] font-semibold tracking-tight text-amber-200">
-                        {book.title
-                          .split(" ")
-                          .slice(0, 2)
-                          .map((w) => w[0])
-                          .join("")}
-                      </span>
-                    )}
-                  </div>
+              {books.slice(0, 3).map((book) => {
+                // Lógica de construcción de imagen corregida
+                const imageUrl = book.coverUrl 
+                  ? (book.coverUrl.startsWith("http") 
+                      ? book.coverUrl 
+                      : `${BASE_URL}${book.coverUrl}`)
+                  : null;
 
-                  <div className="flex-1">
-                    <p className="text-[13px] font-semibold leading-snug text-slate-50">
-                      {book.title}
-                    </p>
-                    <p className="text-[11px] text-slate-400 mt-0.5">
-                      {book.author}
-                    </p>
-                    <span
-                      className="mt-1 inline-flex max-w-max rounded-full bg-amber-400/10 px-2 py-0.5
-                                   text-[10px] font-medium text-amber-200"
-                    >
-                      {book.tag}
-                    </span>
-                  </div>
-
-                  <span
-                    className="inline-flex items-center rounded-full border border-slate-700 px-3 py-1
-                               text-[11px] font-medium text-slate-200
-                               group-hover:border-amber-300 group-hover:text-amber-200"
+                return (
+                  <Link
+                    key={book.id}
+                    to={`/reader/${book.id}/1`}
+                    state={{ book }}
+                    className="group flex items-center gap-3 rounded-2xl border border-slate-800/80 bg-slate-950/60 px-3 py-3
+                             hover:border-amber-300/70 hover:bg-slate-900/80 transition-colors cursor-pointer"
                   >
-                    Leer
-                  </span>
-                </Link>
-              ))}
+                    {/* Usamos la clase CSS pura "book-cover-placeholder" */}
+                    <div className="book-cover-placeholder">
+                      {imageUrl ? (
+                        <img 
+                          src={imageUrl} 
+                          alt={book.title} 
+                          className="h-full w-full object-cover"
+                          onError={(e) => {
+                            const target = e.currentTarget;
+                            target.style.display = 'none'; // Ocultar si falla y mostrar el fallback
+                            // Forzamos el fallback visualizando el siguiente elemento hermano si existe o manejándolo con estado, 
+                            // pero por simplicidad en este diseño, si falla la imagen, el contenedor mostrará el fondo.
+                            // Una mejor opción simple es poner display none a la imagen.
+                          }} 
+                        />
+                      ) : (
+                        <span className="text-[10px] font-semibold tracking-tight text-amber-200">
+                          {book.title
+                            .split(" ")
+                            .slice(0, 2)
+                            .map((w) => w[0])
+                            .join("")}
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="flex-1">
+                      <p className="text-[13px] font-semibold leading-snug text-slate-50">
+                        {book.title}
+                      </p>
+                      <p className="text-[11px] text-slate-400 mt-0.5">
+                        {book.author}
+                      </p>
+                      <span
+                        className="mt-1 inline-flex max-w-max rounded-full bg-amber-400/10 px-2 py-0.5
+                                     text-[10px] font-medium text-amber-200"
+                      >
+                        {book.tag}
+                      </span>
+                    </div>
+
+                    <span
+                      className="inline-flex items-center rounded-full border border-slate-700 px-3 py-1
+                                 text-[11px] font-medium text-slate-200
+                                 group-hover:border-amber-300 group-hover:text-amber-200"
+                    >
+                      Leer
+                    </span>
+                  </Link>
+                );
+              })}
             </div>
           )}
 

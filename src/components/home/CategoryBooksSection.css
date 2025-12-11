@@ -1,105 +1,52 @@
-/* Contenedor que recorta el contenido y añade el efecto de desvanecimiento en los bordes */
+/* src/components/home/CategoryBooksSection.css */
+
 .scrolling-wrapper-categories {
   overflow: hidden;
-  width: 100vw;
-  /* Máscara para que los libros se desvanezcan al entrar y salir por los lados */
-  mask-image: linear-gradient(to right, transparent, black 5%, black 95%, transparent);
-  -webkit-mask-image: linear-gradient(to right, transparent, black 5%, black 95%, transparent);
+  width: 100%;
+  /* Mascara suave en los bordes para un efecto de fade infinito */
+  mask-image: linear-gradient(to right, transparent 0%, black 5%, black 95%, transparent 100%);
+  -webkit-mask-image: linear-gradient(to right, transparent 0%, black 5%, black 95%, transparent 100%);
 }
 
-/* Pista que se mueve. Contiene los items duplicados. */
 .scrolling-track-categories {
   display: flex;
-  /* margin-top: 5px; */
   width: max-content;
-  /* Ajusta la velocidad cambiando los segundos */
-  animation: scrollRight 30s infinite linear;
+  /* Animación lenta y continua */
+  animation: scrollLeft 80s linear infinite;
+  will-change: transform;
 }
 
-/* Pausar animación al pasar el ratón para que el usuario pueda hacer click */
+/* Pausar al hover para facilitar la selección */
 .scrolling-track-categories:hover {
   animation-play-state: paused;
 }
 
-@keyframes scrollRight {
+@keyframes scrollLeft {
   0% {
-    /* Empezamos desplazados un 50% a la izquierda */
-    transform: translateX(-50%);
-  }
-
-  100% {
-    /* Y terminamos en 0, moviéndonos hacia la derecha visualmente */
     transform: translateX(0);
   }
-}
-
-/* CODIGO PARA LAS TARJETAS DEL CARROURSEL */
-.carrouselItem-categories {
-  position: relative;
-  flex-shrink: 0;
-  width: 240px;
-  cursor: pointer;
-  margin: 6px;
-  /* CAMBIO: Aumenté el tiempo a 0.8s y suavicé la curva para que sea muy fluida */
-  transition: transform 1.5s cubic-bezier(0.2, 0.8, 0.2, 1), z-index 0s;
-
-  z-index: 1;
-}
-
-/* Versión responsive equivalente a sm:w-[280px] */
-@media (min-width: 640px) {
-  .carrouselItem-categories {
-    width: 280px;
+  100% {
+    /* 
+       Movemos la pista hacia la izquierda.
+       El valor exacto depende de cuánto contenido hayamos duplicado.
+       Si el array original se repite 3 veces en total (original + copia + copia),
+       mover -33.33% haría un loop perfecto de un set. 
+       Como hemos triplicado el contenido en el componente, usaremos -33.33% aproximadamente
+       o un valor grande si hemos puesto muchos items.
+       Vamos a probar con -50% asumiendo que el usuario verá suficiente contenido antes del corte.
+    */
+    transform: translateX(-50%);
   }
 }
 
-/* Equivalente a la clase group (para hover effects) */
+.carrouselItem-categories {
+  flex-shrink: 0;
+  cursor: pointer;
+  z-index: 1;
+  /* Optimizaciones de renderizado */
+  -webkit-font-smoothing: antialiased;
+}
+
 .carrouselItem-categories:hover {
-  /* AGREGADO: Levanta el elemento y lo escala ligeramente */
-  /* transform: translateY(-10px) translateX(-5px) scale(1.03); */
-  transform: scale(1.03);
-  /* Lo pone por encima de los elementos vecinos */
-  z-index: 10;
-}
-
-/* src/components/home/TopReadBooksSection.css */
-
-.book-overlay-categories {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  
-  /* CAMBIO: Color negro (0,0,0) para oscurecer, en lugar de blanco. */
-  background-color: rgba(0, 0, 0, 0.3);
-  
-  /* Empieza invisible */
-  opacity: 0;
-  transition: opacity 300ms;
-  
-  /* ELIMINADO: Las propiedades backdrop-filter causaban el desenfoque */
-}
-
-.carrouselItem-categories:hover .book-overlay-categories {
-  opacity: 1;
-}
-
-.read-now-btn-categories {
-  background-color: white;
-  color: #020617; /* text-slate-950 */
-  font-size: 11px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.05em; /* tracking-wider */
-  padding: 8px 16px; /* px-4 py-2 */
-  border-radius: 9999px; /* rounded-full */
-  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1); /* shadow-xl */
-  transform: translateY(16px);
-  transition: transform 300ms ease-out;
-}
-
-.carrouselItem-categories:hover .read-now-btn-categories {
-  transform: translateY(0);
-  opacity: 1;
+  z-index: 20;
 }

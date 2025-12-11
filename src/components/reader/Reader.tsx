@@ -93,7 +93,7 @@ const Reader: React.FC<ReaderProps> = ({ url, title, bookId }) => {
   });
 
   const [theme, setTheme] = useState<"light" | "sepia" | "dark">("light");
-  const [fontSize, setFontSize] = useState(100); 
+  const [fontSize, setFontSize] = useState(120); 
   const [fontFamily, setFontFamily] = useState("Merriweather");
   const [lineHeight, setLineHeight] = useState(1.5);
   const [margin, setMargin] = useState(10);
@@ -130,7 +130,7 @@ const Reader: React.FC<ReaderProps> = ({ url, title, bookId }) => {
 
   const renditionRef = useRef<any>(null); 
   const bookRef = useRef<any>(null); 
-  const mouseMoveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const mouseMoveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Function to handle mouse movement and show/hide header
   const handleMouseMove = useCallback((e?: MouseEvent) => {
@@ -268,7 +268,7 @@ const Reader: React.FC<ReaderProps> = ({ url, title, bookId }) => {
           'padding-right': `${margin}px !important`,
         },
         'h1, h2, h3': {
-          'margin-top': '60px !important' 
+          'margin-top': '0 !important' // Removed margin-top for h1, h2, h3
         },
         ".epubjs-hl": {
            "fill": "yellow", "fill-opacity": "0.3", "mix-blend-mode": "multiply"
@@ -561,9 +561,9 @@ const Reader: React.FC<ReaderProps> = ({ url, title, bookId }) => {
 
               contents.addStylesheetRules({
                  "body": { "padding-top": "0 !important" }, // Reset padding since header is overlay now
-                 "h1": { "margin-top": "60pt !important" },
-                 "h2": { "margin-top": "60pt !important" },
-                 ".chapter-title": { "margin-top": "60pt !important" },
+                 "h1": { "margin-top": "0 !important" },
+                 "h2": { "margin-top": "0 !important" },
+                 ".chapter-title": { "margin-top": "0 !important" },
                  
                  ".hl-yellow": { "fill": "#fde047 !important", "fill-opacity": "0.3 !important", "mix-blend-mode": "multiply !important" },
                  ".hl-green": { "fill": "#86efac !important", "fill-opacity": "0.3 !important", "mix-blend-mode": "multiply !important" },

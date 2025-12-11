@@ -4,7 +4,8 @@ export interface Book {
     title: string;
     author: string;
     description: string;
-    coverUrl?: string; // 👈 importante
+    coverUrl?: string;
     tag: string;
+    category?: string; // Comma separated string e.g. "misterio, terror"
   }
   

@@ -5,6 +5,7 @@ import LandingPage from "./pages/LandingPage";
 import ReaderPage from "./pages/ReaderPage";
 import CatalogPage from "./pages/CatalogPage";
 import CategoriesPage from "./pages/CategoriesPage";
+import CategoryDetailPage from "./pages/CategoryDetailPage";
 
 function App() {
   return (
@@ -25,29 +26,12 @@ function App() {
         <Route path="/catalog" element={<CatalogPage />} />
         
         <Route path="/categories" element={<CategoriesPage />} />
-
         
+        {/* Nueva ruta dinámica para categorías */}
+        <Route path="/category/:categorySlug" element={<CategoryDetailPage />} />
       </Routes>
     </BrowserRouter>
   );
 }
 
 export default App;
-
-
-// import { BrowserRouter, Routes, Route } from "react-router-dom";
-// import ReaderPage from "./pages/ReaderPage";
-// import LandingPage from "./pages/LandingPage";
-
-// function App() {
-//   return (
-//     <BrowserRouter>
-//       <Routes>
-//         <Route path="/" element={<LandingPage />} />
-//         <Route path="/reader/:bookId/:chapter" element={<ReaderPage />} />
-//       </Routes>
-//     </BrowserRouter>
-//   );
-// }
-
-// export default App;
